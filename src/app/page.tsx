@@ -68,6 +68,11 @@ export default function Dashboard() {
   const [countdown, setCountdown] = useState(AUTO_POLL_MS / 1000);
   const countdownRef = useRef(AUTO_POLL_MS / 1000);
 
+  // Subscribe form
+  const [subEmail, setSubEmail] = useState("");
+  const [subState, setSubState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [subError, setSubError] = useState("");
+
   async function loadStatus(showLoadingSpinner = false) {
     if (showLoadingSpinner) setLoading(true);
     try {
@@ -80,6 +85,26 @@ export default function Dashboard() {
       setError(String(err));
     } finally {
       if (showLoadingSpinner) setLoading(false);
+    }
+  }
+
+  async function handleSubscribe(e: React.FormEvent) {
+    e.preventDefault();
+    setSubState("loading");
+    setSubError("");
+    try {
+      const res = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: subEmail }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setSubState("success");
+      setSubEmail("");
+    } catch (err) {
+      setSubError(String(err instanceof Error ? err.message : err));
+      setSubState("error");
     }
   }
 
@@ -247,12 +272,46 @@ export default function Dashboard() {
         </table>
       </div>
 
+      {/* Subscribe */}
+      <div className="mt-6 rounded-lg border border-gray-200 bg-white px-5 py-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-gray-800">Get notified when it's in stock</h2>
+        <p className="mt-0.5 text-xs text-gray-500">
+          Enter your email to receive an alert the moment any retailer has the Mac mini M4 Pro
+          available. A confirmation email will be sent immediately.
+        </p>
+        {subState === "success" ? (
+          <p className="mt-3 text-sm font-medium text-green-700">
+            ✓ Subscribed! Check your inbox for a confirmation email.
+          </p>
+        ) : (
+          <form onSubmit={handleSubscribe} className="mt-3 flex gap-2">
+            <input
+              type="email"
+              required
+              placeholder="you@example.com"
+              value={subEmail}
+              onChange={(e) => { setSubEmail(e.target.value); setSubState("idle"); }}
+              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+            <button
+              type="submit"
+              disabled={subState === "loading"}
+              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+            >
+              {subState === "loading" ? "Subscribing…" : "Subscribe"}
+            </button>
+          </form>
+        )}
+        {subState === "error" && (
+          <p className="mt-2 text-xs text-red-600">{subError}</p>
+        )}
+      </div>
+
       {/* Footer note */}
       <p className="mt-4 text-xs text-gray-400">
         Display auto-refreshes every {AUTO_POLL_MS / 1000}s.{" "}
         <strong>Refresh Now</strong> triggers a new live check across all retailers.
-        Email alerts fire automatically on Out of Stock → In Stock transitions when SMTP is
-        configured.
+        Alerts are sent to all subscribers on Out of Stock → In Stock transitions.
       </p>
     </main>
   );

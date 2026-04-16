@@ -22,6 +22,14 @@ model AvailabilityLog {
   @@index([retailer, checkedAt])
 }
 
+// Email subscribers for in-stock alerts
+model Subscriber {
+  id         Int      @id @default(autoincrement())
+  email      String   @unique
+  unsubToken String   @unique @default(uuid())
+  createdAt  DateTime @default(now())
+}
+
 // Latest known status per retailer (upserted on each check)
 model CurrentAvailability {
   retailer    String   @id
