@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const AUTO_POLL_MS = 5_000; // poll /api/status every 5 s (cheap DB read)
 
 type StockStatus = "IN_STOCK" | "OUT_OF_STOCK" | "UNKNOWN";
 
@@ -61,8 +63,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(AUTO_POLL_MS / 1000);
+  const countdownRef = useRef(AUTO_POLL_MS / 1000);
 
-  async function loadStatus() {
+  async function loadStatus(showLoadingSpinner = false) {
+    if (showLoadingSpinner) setLoading(true);
     try {
       const res = await fetch("/api/status");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -72,13 +77,16 @@ export default function Dashboard() {
     } catch (err) {
       setError(String(err));
     } finally {
-      setLoading(false);
+      if (showLoadingSpinner) setLoading(false);
     }
   }
 
   async function handleRefresh() {
     setRefreshing(true);
     setError(null);
+    // Reset countdown so the auto-poll restarts from 5 s after a manual check
+    countdownRef.current = AUTO_POLL_MS / 1000;
+    setCountdown(AUTO_POLL_MS / 1000);
     try {
       const res = await fetch("/api/check", { method: "POST" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -91,9 +99,26 @@ export default function Dashboard() {
     }
   }
 
+  // Initial load
   useEffect(() => {
-    loadStatus();
+    loadStatus(true);
   }, []);
+
+  // Auto-poll /api/status every AUTO_POLL_MS and show a countdown tick
+  useEffect(() => {
+    const tick = setInterval(() => {
+      countdownRef.current -= 1;
+      setCountdown(countdownRef.current);
+      if (countdownRef.current <= 0) {
+        countdownRef.current = AUTO_POLL_MS / 1000;
+        setCountdown(AUTO_POLL_MS / 1000);
+        loadStatus();
+      }
+    }, 1000);
+    return () => clearInterval(tick);
+  }, []);
+
+  const lastChecked = rows.map((r) => r.checkedAt).filter(Boolean).sort().at(-1) ?? null;
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-10">
@@ -110,18 +135,26 @@ export default function Dashboard() {
       </div>
 
       {/* Actions */}
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-gray-500">
-          {rows.length > 0
-            ? `Last refreshed: ${formatDate(rows.map((r) => r.checkedAt).filter(Boolean).sort().at(-1) ?? null)}`
-            : "No data yet — click Refresh to fetch availability"}
-        </p>
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <div className="text-sm text-gray-500">
+          {lastChecked ? (
+            <>
+              Last checked: {formatDate(lastChecked)}
+              <span className="ml-3 text-gray-400">
+                · Refreshing in{" "}
+                <span className="tabular-nums font-medium text-gray-600">{countdown}s</span>
+              </span>
+            </>
+          ) : (
+            "No data yet — click Refresh to fetch availability"
+          )}
+        </div>
         <button
           onClick={handleRefresh}
           disabled={refreshing || loading}
-          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+          className="shrink-0 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
         >
-          {refreshing ? "Checking…" : "Refresh"}
+          {refreshing ? "Checking…" : "Refresh Now"}
         </button>
       </div>
 
@@ -154,21 +187,26 @@ export default function Dashboard() {
             ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
-                  No availability data yet. Click <strong>Refresh</strong> to run the first check.
+                  No availability data yet. Click <strong>Refresh Now</strong> to run the first
+                  check.
                 </td>
               </tr>
             ) : (
               rows.map((row) => (
                 <tr key={row.retailer} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-medium">
-                    <a
-                      href={row.productUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-indigo-600 hover:underline"
-                    >
-                      {row.retailer}
-                    </a>
+                    {row.productUrl ? (
+                      <a
+                        href={row.productUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-indigo-600 hover:underline"
+                      >
+                        {row.retailer}
+                      </a>
+                    ) : (
+                      row.retailer
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={row.stockStatus} />
@@ -183,10 +221,12 @@ export default function Dashboard() {
         </table>
       </div>
 
-      {/* Notification note */}
+      {/* Footer note */}
       <p className="mt-4 text-xs text-gray-400">
-        Notifications fire automatically when a retailer transitions from Out of Stock to In Stock.
-        Configure SMTP settings in your environment to receive email alerts.
+        Display auto-refreshes every {AUTO_POLL_MS / 1000}s.{" "}
+        <strong>Refresh Now</strong> triggers a new live check across all retailers.
+        Email alerts fire automatically on Out of Stock → In Stock transitions when SMTP is
+        configured.
       </p>
     </main>
   );
