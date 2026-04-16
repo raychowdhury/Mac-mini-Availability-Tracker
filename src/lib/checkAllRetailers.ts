@@ -1,11 +1,12 @@
 import { BHConnector } from "@/connectors/bh";
 import { AppleConnector } from "@/connectors/apple";
 import { BestBuyConnector } from "@/connectors/bestbuy";
+import { AdoramaConnector } from "@/connectors/adorama";
 import { prisma } from "@/lib/db";
 import { sendInStockNotification } from "@/lib/notifications";
 import type { AvailabilityResult } from "@/lib/types";
 
-const connectors = [new BHConnector(), new AppleConnector(), new BestBuyConnector()];
+const connectors = [new BHConnector(), new AppleConnector(), new BestBuyConnector(), new AdoramaConnector()];
 
 async function persistResult(result: AvailabilityResult): Promise<void> {
   const checkedAt = new Date(result.checkedAt);
