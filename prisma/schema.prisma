@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Historical record of every availability check
+model AvailabilityLog {
+  id           Int      @id @default(autoincrement())
+  retailer     String
+  stockStatus  String   // IN_STOCK | OUT_OF_STOCK | UNKNOWN
+  price        Float?
+  rawStockText String?
+  sourceType   String   // api | scrape | placeholder | fallback
+  productUrl   String
+  checkedAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([retailer, checkedAt])
+}
+
+// Latest known status per retailer (upserted on each check)
+model CurrentAvailability {
+  retailer    String   @id
+  stockStatus String
+  price       Float?
+  rawStockText String?
+  sourceType  String
+  productUrl  String
+  checkedAt   DateTime
+  updatedAt   DateTime @updatedAt
+}
