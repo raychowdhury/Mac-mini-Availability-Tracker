@@ -67,3 +67,29 @@ export async function sendInStockNotification(result: AvailabilityResult): Promi
     console.error("[Notify] Unexpected error:", err);
   }
 }
+
+// Send a one-time confirmation that SMTP is working. Never throws.
+export async function sendSmtpConfirmation(): Promise<void> {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, ALERT_EMAIL_TO } = process.env;
+  if (!SMTP_HOST || !ALERT_EMAIL_TO) return;
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT ? parseInt(SMTP_PORT, 10) : 587,
+      secure: SMTP_PORT === "465",
+      auth: SMTP_USER && SMTP_PASS ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
+    });
+
+    await transporter.sendMail({
+      from: SMTP_USER ?? `tracker@${SMTP_HOST}`,
+      to: ALERT_EMAIL_TO,
+      subject: "[Mac mini Tracker] Email notifications are active",
+      text: `Your Mac mini Availability Tracker is configured and ready.\n\nYou will receive an alert at this address whenever any retailer transitions from Out of Stock to In Stock for:\n\n  Apple Mac mini M4 Pro\n  14-core CPU / 20-core GPU / 64GB / 1TB\n\nRetailers monitored:\n  - B&H Photo\n  - Apple\n  - Best Buy\n  - Adorama\n\nThis is a one-time confirmation that your SMTP settings are working correctly.`,
+    });
+
+    console.log(`[Notify] Confirmation email sent to ${ALERT_EMAIL_TO}`);
+  } catch (err) {
+    console.error("[Notify] Failed to send confirmation email:", err);
+  }
+}

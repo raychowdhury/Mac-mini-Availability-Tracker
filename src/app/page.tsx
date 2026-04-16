@@ -62,6 +62,8 @@ export default function Dashboard() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(AUTO_POLL_MS / 1000);
   const countdownRef = useRef(AUTO_POLL_MS / 1000);
@@ -78,6 +80,20 @@ export default function Dashboard() {
       setError(String(err));
     } finally {
       if (showLoadingSpinner) setLoading(false);
+    }
+  }
+
+  async function handleTestEmail() {
+    setTestingEmail(true);
+    setEmailSent(false);
+    try {
+      await fetch("/api/notify-test", { method: "POST" });
+      setEmailSent(true);
+      setTimeout(() => setEmailSent(false), 4000);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setTestingEmail(false);
     }
   }
 
@@ -149,13 +165,23 @@ export default function Dashboard() {
             "No data yet — click Refresh to fetch availability"
           )}
         </div>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing || loading}
-          className="shrink-0 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
-        >
-          {refreshing ? "Checking…" : "Refresh Now"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleTestEmail}
+            disabled={testingEmail}
+            title="Send a test confirmation email"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+          >
+            {testingEmail ? "Sending…" : emailSent ? "✓ Sent" : "Test Email"}
+          </button>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+          >
+            {refreshing ? "Checking…" : "Refresh Now"}
+          </button>
+        </div>
       </div>
 
       {/* Error */}
