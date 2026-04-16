@@ -10,7 +10,7 @@ type Row = {
   price: number | null;
   sourceType: string;
   productUrl: string;
-  checkedAt: string;
+  checkedAt: string | null;
   rawStockText?: string | null;
 };
 
@@ -41,7 +41,8 @@ function formatPrice(price: number | null): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(price);
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string | null): string {
+  if (!iso) return "—";
   try {
     return new Intl.DateTimeFormat("en-US", {
       month: "short",
@@ -112,7 +113,7 @@ export default function Dashboard() {
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-gray-500">
           {rows.length > 0
-            ? `Last refreshed: ${formatDate(rows.map((r) => r.checkedAt).sort().at(-1) ?? "")}`
+            ? `Last refreshed: ${formatDate(rows.map((r) => r.checkedAt).filter(Boolean).sort().at(-1) ?? null)}`
             : "No data yet — click Refresh to fetch availability"}
         </p>
         <button
